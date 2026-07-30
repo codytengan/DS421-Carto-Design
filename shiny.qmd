@@ -4,7 +4,7 @@ author: "DS421 – Cartographic Design"
 format:
   html:
     code-fold: true
-    toc: true
+    toc: true 
     theme: cosmo
 execute:
   echo: true
