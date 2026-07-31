@@ -216,5 +216,113 @@ Can you add the functionality to your census shiny app (new panel) that allows u
 We should remain careful about our use/potential dependence on AI for coding but for cases like these where we have built all the individual parts, AI can be really helpful in putting them together in a sleek design on a shiny app.
 
 ```{r}
+ui <- fluidPage(
+  titlePanel("Fire Predictions"),
+  tabsetPanel(
+    tabPanel(
+      "Fire Map",
+      sidebarLayout(
+        sidebarPanel(
+          selectInput(
+            "var",
+            "Choose fire confidence",
+            choices = unique(sf_fire_csv_data$confidence)
+          )
+        ),
+        mainPanel(
+          leafletOutput("map", height = "700px")
+        )
+      )
+    ),
+    tabPanel(
+      "Scatter Plot",
+      sidebarLayout(
+        sidebarPanel(
+          selectInput(
+            "xvar",
+            "X-axis variable",
+            choices = names(sf_fire_csv_data)[sapply(sf_fire_csv_data, is.numeric)]
+          ),
+          selectInput(
+            "yvar",
+            "Y-axis variable",
+            choices = names(sf_fire_csv_data)[sapply(sf_fire_csv_data, is.numeric)],
+            selected = names(sf_fire_csv_data)[sapply(sf_fire_csv_data, is.numeric)][2]
+          )
+        ),
+        mainPanel(
+          plotlyOutput("scatter", height = "600px")
+        )
+      )
+    )
+  )
+)
 
+server <- function(input, output, session) {
+  
+  output$map <- renderLeaflet({
+    filtered_data <- sf_fire_csv_data[sf_fire_csv_data$confidence == input$var, ]
+    
+    mapview(
+      filtered_data,
+      zcol = "confidence",
+      layer.name = "Confidence"
+    )@map
+  })
+  
+  output$scatter <- renderPlotly({
+    req(input$xvar, input$yvar)
+    
+    p <- ggplot(sf_fire_csv_data, aes(x = .data[[input$xvar]], y = .data[[input$yvar]])) +
+      geom_point(alpha = 0.6) +
+      stat_cor(method = "pearson", label.x.npc = "left", label.y.npc = "top") +
+      geom_smooth(method = "lm", se = FALSE, color = "steelblue") +
+      labs(
+        x = input$xvar,
+        y = input$yvar,
+        title = paste(input$yvar, "vs", input$xvar)
+      ) +
+      theme_minimal()
+    
+    ggplotly(p)
+  })
+}
+
+shinyApp(ui, server)
+```
+
+challenge shiny qmd
+
+```{r}
+county_data <- st_read("data/county_data.gpkg")
+
+numeric_vars <- names(county_data)[sapply(county_data, is.numeric)]
+
+ui <- fluidPage(
+  titlePanel("County Data Explorer"),
+  sidebarLayout(
+    sidebarPanel(
+      selectInput(
+        "var",
+        "Choose variable to display",
+        choices = numeric_vars
+      )
+    ),
+    mainPanel(
+      leafletOutput("map", height = "700px")
+    )
+  )
+)
+
+server <- function(input, output, session) {
+  output$map <- renderLeaflet({
+    mapview(
+      county_data,
+      zcol = input$var,
+      layer.name = input$var
+    )@map
+  })
+}
+
+shinyApp(ui, server)
 ```
