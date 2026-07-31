@@ -296,16 +296,18 @@ challenge shiny qmd
 ```{r}
 county_data <- st_read("data/county_data.gpkg")
 
+names(county_data)
+
 numeric_vars <- names(county_data)[sapply(county_data, is.numeric)]
 
 ui <- fluidPage(
-  titlePanel("County Data Explorer"),
+  titlePanel("Languages"),
   sidebarLayout(
     sidebarPanel(
       selectInput(
         "var",
-        "Choose variable to display",
-        choices = numeric_vars
+        "Choose a language",
+        choices = sort(unique(na.omit(county_data$language)))
       )
     ),
     mainPanel(
@@ -316,10 +318,12 @@ ui <- fluidPage(
 
 server <- function(input, output, session) {
   output$map <- renderLeaflet({
+    filtered_data <- county_data[county_data$language == input$var, ]
+    
     mapview(
-      county_data,
-      zcol = input$var,
-      layer.name = input$var
+      filtered_data,
+      zcol = "percent_speakers",
+      layer.name = "percent_speakers"
     )@map
   })
 }
