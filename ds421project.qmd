@@ -1,0 +1,136 @@
+---
+title: "Hotels"
+format: html
+editor: visual
+---
+
+```{r}
+library(shiny)
+library(tidyverse)
+library(sf)
+library(mapgl)
+library(lubridate)
+library(bslib)
+library(here)
+library(tidycensus)
+library(ggpubr)
+library(plotly)
+library(mapview)
+library(leaflet)
+library(tmap)
+```
+
+```{r}
+underserved <- st_read("data/Medically_Underserved_Areas___Populations.geojson")
+hospitals   <- st_read("data/Hospitals.geojson")
+trauma      <- st_read("data/Trauma_Centers.geojson")
+
+
+underserved <- st_transform(underserved, 4326)
+hospitals   <- st_transform(hospitals, 4326)
+trauma      <- st_transform(trauma, 4326)
+
+#trauma center levels
+trauma_pal <- colorFactor(
+  palette = c("green", "yellow", "orange"),
+  levels  = c("Level I", "Level II", "Level III")
+)
+
+#MUA/MUP colors
+mua_pal <- colorFactor(
+  palette = c("#1f78b4", "#33a02c", "#e31a1c", "#ff7f00"),
+  levels  = c("MUA", "MUP", "MUA-GE", "MUP-GE")
+)
+
+ui <- fluidPage(
+  titlePanel("Hawaii Trauma Centers & Hospitals vs. Medically Underserved Areas"),
+  sidebarLayout(
+    sidebarPanel(
+      helpText("Use the layers icon on the map to toggle each group on/off."),
+      hr(),
+      helpText("Trauma Center colors:"),
+      tags$ul(
+        tags$li(tags$span(style = "color:green;", "\u25CF"), " Level I"),
+        tags$li(tags$span(style = "color:#c9b800;", "\u25CF"), " Level II"),
+        tags$li(tags$span(style = "color:orange;", "\u25CF"), " Level III")
+      ),
+      helpText("Hospitals without a trauma center are shown in orange."),
+      hr(),
+      helpText("Medically Underserved designation:"),
+      tags$ul(
+        tags$li(tags$span(style = "color:#1f78b4;", "\u25CF"), " Medically Underserved Area (MUA)"),
+        tags$li(tags$span(style = "color:#33a02c;", "\u25CF"), " Medically Underserved Population (MUP)"),
+        tags$li(tags$span(style = "color:#e31a1c;", "\u25CF"), " MUA - Governor's Exception"),
+        tags$li(tags$span(style = "color:#ff7f00;", "\u25CF"), " MUP - Governor's Exception")
+      )
+    ),
+    mainPanel(
+      leafletOutput("map", height = "700px")
+    )
+  )
+)
+
+server <- function(input, output, session) {
+  
+  output$map <- renderLeaflet({
+    leaflet() %>%
+      addProviderTiles("CartoDB.Positron") %>%
+      
+     
+      addPolygons(
+        data = underserved,
+        color = "gray30",
+        weight = 1,
+        fillColor = ~mua_pal(muadgntpcd),
+        fillOpacity = 0.5,
+        label = ~paste0(muasvcarnm, " (", muadgntypd, ")"),
+        group = "Medically Underserved Areas"
+      ) %>%
+      
+      
+      addCircleMarkers(
+        data = hospitals,
+        color = "orange",
+        radius = 5,
+        stroke = FALSE,
+        fillOpacity = 0.8,
+        label = ~name,
+        group = "Hospitals"
+      ) %>%
+      
+      
+      addCircleMarkers(
+        data = trauma,
+        color = ~trauma_pal(trauma_level),
+        radius = 6,
+        stroke = TRUE,
+        weight = 1,
+        fillOpacity = 0.9,
+        label = ~paste0(facility_name, " (", trauma_level, ")"),
+        group = "Trauma Centers"
+      ) %>%
+      
+      addLegend(
+        position = "bottomright",
+        pal = trauma_pal,
+        values = trauma$trauma_level,
+        title = "Trauma Level"
+      ) %>%
+      
+      addLegend(
+        position = "bottomleft",
+        pal = mua_pal,
+        values = underserved$muadgntpcd,
+        title = "MUA/MUP Designation",
+        labFormat = labelFormat()
+      ) %>%
+      
+      addLayersControl(
+        overlayGroups = c("Medically Underserved Areas", "Hospitals", "Trauma Centers"),
+        options = layersControlOptions(collapsed = FALSE)
+      )
+  })
+}
+
+shinyApp(ui, server)
+```
